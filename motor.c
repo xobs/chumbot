@@ -11,35 +11,46 @@
 #include "motor.h"
 
 void left_motor(int percent) {
-	pwm_left(PWM_IDLE_MIN-((PWM_IDLE_MIN - PWM_MAX_FORWARD_SPEED) * percent / 100));
+	int speed;
+	if(percent<-100)
+		percent=-100;
+	if(percent>100)
+		percent=100;
+
+	if(percent > -10 && percent < 10)
+		percent = 0;
+
+	// -100% => PWM_MAX_REVERSE_SPEED
+	//  100% => PWM_MAX_FORWARD_SPEED
+	//    0% => PWM_IDLE_STOP
+	if(percent)
+		speed = PWM_IDLE_STOP + ((PWM_MAX_FORWARD_SPEED-PWM_IDLE_STOP)*(percent/100.0));
+	else
+		speed = 0;
+
+	// Set the left PWM to have an active time anywhere from 1-2ms.
+	// A percentage of 0 should equate to an idle time of 1.5ms.
+	//fprintf(stderr, "Setting left motor: %04x\n", speed);
+	pwm_left(speed);
 }
 
 void right_motor(int percent) {
-	pwm_right(PWM_IDLE_MAX-((PWM_IDLE_MAX - PWM_MAX_REVERSE_SPEED) * percent / 100));
+	int speed;
+	percent *= -1;
+	if(percent<-100)
+		percent=-100;
+	if(percent>100)
+		percent=100;
+
+	if(percent > -10 && percent < 10)
+		percent = 0;
+
+	if(percent)
+		speed = PWM_IDLE_STOP + ((PWM_MAX_FORWARD_SPEED-PWM_IDLE_STOP)*(percent/100.0));
+	else
+		speed = 0;
+
+	//fprintf(stderr, "Setting right motor: %04x\n", speed);
+	pwm_right(speed);
 }
 
-/*
-void stop() {
-	pwm_drive(PWM_IDLE_MIN);
-}
-
-void turn_left(int percent) {
-	pwm_turn(PWM_IDLE_MAX+((PWM_MAX_LEFT_TURN-PWM_IDLE_MAX) * percent / 100));
-//	ltemp = PWM_IDLE_MAX+((PWM_MAX_LEFT_TURN-PWM_IDLE_MAX) * percent / 100);
-//	fprintf(stderr,"TURN LEFT PWM VALUE: %x\n\n",ltemp);
-}
-
-void turn_right(int percent) {
-	pwm_turn(PWM_IDLE_MIN-((PWM_IDLE_MIN - PWM_MAX_RIGHT_TURN) * percent / 100));
-}
-
-void turn_center() {
-	pwm_turn(PWM_IDLE_MIN);
-}
-
-void init_car() {
-	pwm_init(); // configure pwm pins
-	pwm_drive(PWM_IDLE_MIN); // make sure wheels are not spinning
-	pwm_turn(PWM_IDLE_MIN); // center the wheels
-}
-*/

@@ -17,7 +17,8 @@
 #define PWM_MAX_LEFT_TURN       0x18BA
 */
 
-#define PWM_MAX_FORWARD_SPEED   0x11F0
+#define PWM_IDLE_STOP           0x11d0
+#define PWM_MAX_FORWARD_SPEED   0x0b3a
 #define PWM_MAX_REVERSE_SPEED   0x1350
 
 int pwm_init();
