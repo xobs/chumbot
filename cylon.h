@@ -3,5 +3,5 @@
 int cylon_init(void);
 void *cylon_process(void *ignored);
 int cylon_start(void);
-void cylon_exit(void);
+void cylon_stop(void);
 #endif // __CYLON_H__

@@ -1,8 +1,5 @@
 /*
- * Author:  Michael Ortiz
- * Email:   mtortiz.mail@gmail.com
- * 
- * Desc:    Functions for car pwm signal control. Includes a tuning driver.
+ * Cylon lights connected to LCD pins 0-17, located on bank 1, pins 0-17.
  */
 
 #include <stdlib.h>
@@ -11,10 +8,21 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <pthread.h>
 
+#define HW_PINCTRL_MUXSEL1      0x80018110
+#define HW_PINCTRL_MUXSEL2      0x80018120
 #define HW_PINCTRL_MUXSEL3      0x80018130
 #define HW_PINCTRL_MUXSEL3_SET  0x80018134
 #define HW_PINCTRL_MUXSEL3_CLR  0x80018138
+
+#define HW_PINCTRL_DOUT1        0x80018510
+#define HW_PINCTRL_DOUT1_SET    0x80018514
+#define HW_PINCTRL_DOUT1_CLR    0x80018518
+
+#define HW_PINCTRL_DOE1         0x80018710
+#define HW_PINCTRL_DOE1_SET     0x80018714
+#define HW_PINCTRL_DOE1_CLR     0x80018718
 
 #define HW_PWM_CTRL             0x80064000
 #define HW_PWM_CTRL_SET         0x80064004
@@ -29,6 +37,49 @@
 #define HW_PWM_PERIOD3          0x80064080
 #define HW_PWM_ACTIVE4          0x80064090
 #define HW_PWM_PERIOD4          0x800640a0
+
+static int cylon_pin[] = {
+    16,
+    14,  
+    12,
+    11,
+    9,
+    7,
+    4,
+    2,
+    0,
+    17,
+    15,
+    13,
+    10,
+    8,
+    6,
+    5,
+    3,
+    1,
+
+    1,
+    3,
+    5,
+    6,
+    8,
+    10,
+    13,
+    15,
+    17,
+    0,
+    2,
+    4,
+    7,
+    9,
+    11,
+    12,
+    14,
+    16,
+};
+
+static pthread_t cylon_thread;
+static int exit_cylon;
 
 static int *mem = 0;
 static int fd = 0;
@@ -101,62 +152,39 @@ static int write_kernel_memory(long offset, long value) {
 }
 
 
-/******************************************************************************
- * pwm_init
- *
- * params:
- *      na
- *
- * desc:
- *      configures the pwm pins
- *****************************************************************************/
-int pwm_init()
-{
-    //Change mux to use pins and set to pwm output for PWM3 and PWM4
-    write_kernel_memory(HW_PINCTRL_MUXSEL3_CLR, 0x3f000000);
-    write_kernel_memory(HW_PWM_CTRL_SET,        0x0000001c);
+int cylon_init(void) {
+    // Change mux to use pins as GPIOs
+    write_kernel_memory(HW_PINCTRL_MUXSEL2,     0xffffffff);
+    write_kernel_memory(HW_PINCTRL_MUXSEL3_SET, 0x0000000f);
+	write_kernel_memory(HW_PINCTRL_DOUT1,       0x00000000);
+	write_kernel_memory(HW_PINCTRL_DOE1,        0x0003ffff);
     return 0;
 }
 
-/******************************************************************************
- * pwm_turn
- *
- * params:
- *      int value - pwm register setting for the "turning" pwm signal 
- *
- * desc:
- *      sets the "turning" pwm register to the specified value
- *****************************************************************************/
-int pwm_right(int value)
-{
-	value = (value << 16) & 0xffff0000L;
-	//fprintf(stderr, "Setting HW_PWM_ACTIVE3: %08x: ", value);
-    write_kernel_memory(HW_PWM_ACTIVE3, value);
-	//fprintf(stderr, "%08x\n", read_kernel_memory(HW_PWM_ACTIVE3));
+void *cylon_process(void *ignored) {
+	int cylon_progress = 0;
+	while(!exit_cylon) {
+		write_kernel_memory(HW_PINCTRL_DOUT1_SET, 1<<cylon_pin[cylon_progress]);
 
-	// Divide the 24 MHz crystal by 8, and set a period of 0xea60.
-	// This will give us a period of 20ms.
-	write_kernel_memory(HW_PWM_PERIOD3, 0x003bea60);
+		// Increment the current pin, looping if necessary.
+		cylon_progress++;
+		if(cylon_progress >= sizeof(cylon_pin)/sizeof(*cylon_pin))
+			cylon_progress = 0;
+
+		write_kernel_memory(HW_PINCTRL_DOUT1_CLR, 1<<cylon_pin[cylon_progress]);
+		usleep(30000);
+	}
+	return NULL;
+}
+
+
+int cylon_start(void) {
+	exit_cylon = 0;
+	pthread_create(&cylon_thread, NULL, cylon_process, NULL);
+	pthread_detach(cylon_thread);
 	return 0;
 }
 
-/******************************************************************************
- * pwm_drive
- *
- * params:
- *      int value - pwm register setting for the "drive" pwm signal 
- *
- * desc:
- *      sets the "drive" pwm register to the specified value
- *****************************************************************************/
-int pwm_left(int value)
-{
-	//fprintf(stderr, "Setting HW_PWM_ACTIVE4: %08x: ", value<<16);
-    write_kernel_memory(HW_PWM_ACTIVE2, value << 16);
-	//fprintf(stderr, "%08x\n", read_kernel_memory(HW_PWM_ACTIVE3));
-
-	// Divide the 24 MHz crystal by 8, and set a period of 0xea60.
-	// This will give us a period of 20ms.
-    write_kernel_memory(HW_PWM_PERIOD2, 0x003bea60);
-    return 0;
+void cylon_stop(void) {
+	exit_cylon = 1;
 }

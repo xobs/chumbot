@@ -4,6 +4,7 @@
 #include <fcntl.h>
 
 #include "motor.h"
+#include "cylon.h"
 #include "SDL.h"
 #include "InputEvent.h"
 #include "USBMissileLauncher.h"
@@ -28,6 +29,11 @@ int main(int argc, char **argv) {
 
 	// Initialize motors.
 	pwm_init();
+
+
+	// Initialize cylon lights.
+	cylon_init();
+	cylon_start();
 
 
 	// Initialize joystick.
@@ -94,16 +100,15 @@ int main(int argc, char **argv) {
 				case SDL_JOYBUTTONDOWN:
 					if(e.jbutton.button == 0)
 						new_hat_value |= 0x1000;
-					fprintf(stderr, "Button %d down\n", e.jbutton.button);
 					break;
 
 				case SDL_JOYBUTTONUP:
 					if(e.jbutton.button == 0)
 						hat_value &= (~0x1000);
-					fprintf(stderr, "Button %d up\n", e.jbutton.button);
 					break;
 
 				case SDL_NOEVENT:
+					cylon_stop();
 					break;
 
 				case SDL_QUIT:
@@ -120,16 +125,22 @@ int main(int argc, char **argv) {
 		if(missile_control && (new_hat_value != hat_value)) {
 			char missile_message = 0;
 			hat_value = new_hat_value;
+
 			if(hat_value & SDL_HAT_DOWN)
-				missile_message |= MISSILE_LAUNCHER_CMD_UP;
-			if(hat_value & SDL_HAT_UP)
 				missile_message |= MISSILE_LAUNCHER_CMD_DOWN;
+
+			if(hat_value & SDL_HAT_UP)
+				missile_message |= MISSILE_LAUNCHER_CMD_UP;
+
 			if(hat_value & SDL_HAT_LEFT)
 				missile_message |= MISSILE_LAUNCHER_CMD_LEFT;
+
 			if(hat_value & SDL_HAT_RIGHT)
 				missile_message |= MISSILE_LAUNCHER_CMD_RIGHT;
+
 			if(hat_value & 0x1000)
 				missile_message |= MISSILE_LAUNCHER_CMD_FIRE;
+
 			missile_do(missile_control, missile_message, missile_type);
 		}
 	}
